@@ -9,7 +9,7 @@ sudo dnf install -y tigervnc-server
 # Verificar si startplasma-x11 está disponible
 if ! command -v startplasma-x11 &> /dev/null; then
     echo "startplasma-x11 no está instalado. Instalando plasma-desktop..."
-    sudo dnf install -y plasma-desktop
+    sudo dnf install -y plasma-workspace-x11
 fi
 
 # Crear un archivo de servicio para el servidor VNC
