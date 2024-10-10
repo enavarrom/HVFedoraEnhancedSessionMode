@@ -1,20 +1,19 @@
 #!/bin/bash
 # Install Hyper-V Enhanced Session Mode on Fedora 30
 
-# Remove old xrdp installation if present and install xrdp
-sudo dnf remove -y xrdp xrdp-selinux
-sudo dnf install -y xrdp startplasma-x11
+# Load the Hyper-V kernel module
+
+sudo dnf update -y
+
+sudo dnf remove -y xrdp xrdp-selinux plasma-workspace-x11
+sudo dnf install -y xrdp plasma-workspace-x11
 
 SESMAN_FILE="/etc/pam.d/xrdp-sesman"
-STARTWM_FILE="/etc/xrdp/startwm.sh"
-SESMAN_INI_FILE="/etc/xrdp/sesman.ini"
-POLKIT_RULES_FILE="/etc/polkit-1/rules.d/99-allow-reboot.rules"
-GROUP_NAME="remote"
 
-# Create a backup of the original xrdp-sesman file
-cp $SESMAN_FILE ${SESMAN_FILE}.bak
+# Create a backup of the original file
+sudo cp $SESMAN_FILE ${SESMAN_FILE}.bak
 
-# Use sed to comment and uncomment specific lines in xrdp-sesman
+# Use sed to perform the commenting and uncommenting
 sed -i.bak \
     -e '/auth\s\+include\s\+password-auth/s/^/#/' \
     -e '/account\s\+include\s\+password-auth/s/^/#/' \
@@ -26,12 +25,15 @@ sed -i.bak \
     -e '/#session\s\+include\s\+gdm-password/s/^#//' \
     "$SESMAN_FILE"
 
-# Configure xrdp settings
+# Configure xrdp
 sudo sed -i "/^port=3389/c\port=vsock://-1:3389" /etc/xrdp/xrdp.ini
 sudo sed -i "/^security_layer=.*/c\security_layer=rdp" /etc/xrdp/xrdp.ini
 sudo sed -i "/^bitmap_compression=.*/c\bitmap_compression=false" /etc/xrdp/xrdp.ini
 
+sudo systemctl enable xrdp xrdp-sesman
+
 # Create the startwm.sh file
+STARTWM_FILE="/etc/xrdp/startwm.sh"
 cat << 'EOF' | sudo tee $STARTWM_FILE > /dev/null
 #!/bin/sh
 
@@ -49,28 +51,29 @@ EOF
 # Make startwm.sh executable
 sudo chmod +x $STARTWM_FILE
 
+
 # Configure sesman.ini to use the new XSession
+SESMAN_INI_FILE="/etc/xrdp/sesman.ini"
+
 echo -e "[XSession]\nparam=/etc/xrdp/startwm.sh" | sudo tee -a $SESMAN_INI_FILE > /dev/null
 
 # Create the Polkit rule for reboot and power-off
+POLKIT_RULES_FILE="/etc/polkit-1/rules.d/99-allow-reboot.rules"
+
 cat << 'EOF' | sudo tee $POLKIT_RULES_FILE > /dev/null
 polkit.addRule(function(action, subject) {
     if (action.id == "org.freedesktop.login1.reboot" ||
         action.id == "org.freedesktop.login1.power-off") {
-        if (subject.isInGroup("remote")) {
+        if (subject.isInGroup("wheel")) {
             return polkit.Result.YES;
         }
     }
 });
 EOF
 
-# Create the remote group if it does not exist and add the current user to it
-if ! getent group $GROUP_NAME > /dev/null; then
-    sudo groupadd $GROUP_NAME
-fi
+sudo systemctl restart xrdp xrdp-sesman polkit
 
-sudo usermod -aG $GROUP_NAME $USER
 
-# Enable and restart xrdp and xrdp-sesman services
-sudo systemctl enable xrdp xrdp-sesman
-sudo systemctl restart xrdp xrdp-sesman
+
+
+
