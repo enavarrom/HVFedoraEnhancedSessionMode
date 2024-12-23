@@ -8,8 +8,6 @@ sudo dnf update -y
 sudo dnf remove -y xrdp xrdp-selinux plasma-workspace-x11
 sudo dnf install -y xrdp plasma-workspace-x11
 
-SESMAN_FILE="/etc/pam.d/xrdp-sesman"
-
 sudo systemctl enable xrdp xrdp-sesman
 
 # Create the startwm.sh file
